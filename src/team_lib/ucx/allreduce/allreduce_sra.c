@@ -4,6 +4,8 @@
 #include "xccl_ucx_sendrecv.h"
 #include "utils/mem_component.h"
 
+#define ENABLE_REDUCE 1
+
 enum {
     SRA_KNOMIAL_SCATTER_REDUCE_START,
     SRA_KNOMIAL_SCATTER_REDUCE_PROGRESS,
@@ -201,6 +203,7 @@ PHASE_EXTRA:
         if (KN_EXTRA == node_type) {
             goto completion;
         } else {
+#if ENABLE_REDUCE
             xccl_mem_component_reduce(req->args.buffer_info.src_buffer,
                                       req->allreduce_sra.scratch,
                                       req->args.buffer_info.dst_buffer,
@@ -208,6 +211,7 @@ PHASE_EXTRA:
                                       req->args.reduce_info.dt,
                                       req->args.reduce_info.op,
                                       req->src_mem_type);
+#endif
             req->args.buffer_info.src_buffer = req->args.buffer_info.dst_buffer;
         }
     }
@@ -267,10 +271,12 @@ PHASE_1:
             local_seg_offset  = compute_seg_offset(block_count, step_radix, local_seg_index);
             void *local_data  = (void*)((ptrdiff_t)src_buffer + (size_t)local_seg_offset*dt_size);
             void *reduce_data = req->allreduce_sra.scratch;
+#if ENABLE_REDUCE
             xccl_mem_component_reduce_multi(local_data, dst_buffer, reduce_data,
                                             active_reqs/2, local_seg_count,
                                             local_seg_count*dt_size, req->args.reduce_info.dt,
                                             req->args.reduce_info.op, req->src_mem_type);
+#endif
             radix_pow *= radix;
         }
     }

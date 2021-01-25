@@ -161,17 +161,6 @@ xccl_dpu_context_create(xccl_team_lib_h lib, xccl_context_params_t *params,
     cfg = ucs_derived_of(config, xccl_tl_dpu_context_config_t);
     XCCL_CONTEXT_SUPER_INIT(ctx->super, lib, params);
 
-#if 0
-    if (atoi(getenv("OMPI_COMM_WORLD_RANK")) == 0) {
-        strcpy(cfg->server_hname, "thor001");
-    }
-    else if (atoi(getenv("OMPI_COMM_WORLD_RANK")) == 1) {
-        strcpy(cfg->server_hname, "thor002");
-    }
-    else {
-        fprintf(stderr, "error %s", __FUNCTION__);
-    }
-#endif
     gethostname(hname, sizeof(hname) - 1);
     if (cfg->use_dpu) {
         char *h = calloc(1, 256);
@@ -552,6 +541,8 @@ static xccl_status_t xccl_dpu_collective_post(xccl_tl_coll_req_t *request)
     req_param.datatype     = ucp_dt_make_contig(1);
     req_param.cb.send      = send_handler_nbx;
 
+    /* data xfer */
+#if DATA_XFER
     send_req[0] = ucp_put_nbx(dpu_ctx->ucp_ep, req->args.buffer_info.src_buffer,
                               req->args.reduce_info.count * xccl_dt_size(req->args.reduce_info.dt),
                               dpu_team->rem_data_in, dpu_team->rem_data_in_key,
@@ -560,6 +551,8 @@ static xccl_status_t xccl_dpu_collective_post(xccl_tl_coll_req_t *request)
         return XCCL_ERR_NO_MESSAGE;
     }
     ucp_worker_fence(dpu_ctx->ucp_worker);
+#endif
+
     send_req[1] = ucp_put_nbx(dpu_ctx->ucp_ep, &req->sync, sizeof(req->sync),
                               dpu_team->rem_ctrl_seg, dpu_team->rem_ctrl_seg_key,
                               &req_param);
@@ -568,9 +561,13 @@ static xccl_status_t xccl_dpu_collective_post(xccl_tl_coll_req_t *request)
     }
     do {
         ucp_worker_progress(dpu_ctx->ucp_worker);
+#if DATA_XFER
     } while((ucx_req_test(&(send_req[0]), dpu_ctx->ucp_worker) != XCCL_OK) ||
             (ucx_req_test(&(send_req[1]), dpu_ctx->ucp_worker) != XCCL_OK));
+#else
+    } while((ucx_req_test(&(send_req[1]), dpu_ctx->ucp_worker) != XCCL_OK));
 
+#endif 
     return XCCL_OK;
 }
 
@@ -598,6 +595,8 @@ static xccl_status_t xccl_dpu_collective_test(xccl_tl_coll_req_t *request)
     req_param.datatype     = ucp_dt_make_contig(1);
     req_param.cb.recv      = recv_handler_nbx;
 
+    /* data xfer recv */
+#if DATA_XFER
     recv_req = ucp_get_nbx(dpu_ctx->ucp_ep, req->args.buffer_info.dst_buffer,
                            req->args.reduce_info.count * xccl_dt_size(req->args.reduce_info.dt),
                            dpu_team->rem_data_out, dpu_team->rem_data_out_key,
@@ -608,6 +607,7 @@ static xccl_status_t xccl_dpu_collective_test(xccl_tl_coll_req_t *request)
     do {
         ucp_worker_progress(dpu_ctx->ucp_worker);
     } while((ucx_req_test(&recv_req, dpu_ctx->ucp_worker) != XCCL_OK));
+#endif
 
     return XCCL_OK;
 }

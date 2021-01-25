@@ -37,23 +37,31 @@ int main (int argc, char **argv) {
         .tag  = 123, //todo
     };
 
-    XCCL_CHECK(xccl_collective_init(&coll, &request, xccl_world_team));
-    XCCL_CHECK(xccl_collective_post(request));
-    while (XCCL_OK != xccl_collective_test(request)) {
-        xccl_context_progress(team_ctx);
-    }
-    XCCL_CHECK(xccl_collective_finalize(request));
+    int j = 0;
+    for (i = 0; i < 10; i ++) {
+        for (j=0; j<count; j++) {
+            rbuf[j] = 0;
+            sbuf[j] = rank+1+12345 + j;
+        }
 
-    MPI_Allreduce(sbuf, rbuf_mpi, count, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+        XCCL_CHECK(xccl_collective_init(&coll, &request, xccl_world_team));
+        XCCL_CHECK(xccl_collective_post(request));
+        while (XCCL_OK != xccl_collective_test(request)) {
+            xccl_context_progress(team_ctx);
+        }
+        XCCL_CHECK(xccl_collective_finalize(request));
 
-    if (0 != memcmp(rbuf, rbuf_mpi, count*sizeof(int))) {
-        fprintf(stderr, "RST CHECK FAILURE at rank %d\n", rank);
-        status = 1;
-    }
+        MPI_Allreduce(sbuf, rbuf_mpi, count, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
-    MPI_Reduce(&status, &status_global, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
-    if (0 == rank) {
-        printf("Correctness check: %s\n", status_global == 0 ? "PASS" : "FAIL");
+        if (0 != memcmp(rbuf, rbuf_mpi, count*sizeof(int))) {
+            fprintf(stderr, "i = %d, RST CHECK FAILURE at rank %d\n", i, rank);
+            status = 1;
+        }
+        
+        MPI_Reduce(&status, &status_global, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+        if (0 == rank) {
+            printf("Correctness check i=%d: %s\n", i, status_global == 0 ? "PASS" : "FAIL");
+        }
     }
 
     xccl_mpi_test_finalize();

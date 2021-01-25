@@ -9,6 +9,8 @@
 #include "xccl_team_lib.h"
 #include <ucp/api/ucp.h>
 
+#define DATA_XFER 1 /* for performance analysis */
+
 typedef struct xccl_team_lib_dpu_config {
     xccl_team_lib_config_t super;
 } xccl_team_lib_dpu_config_t;

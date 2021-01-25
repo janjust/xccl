@@ -69,6 +69,7 @@ void *dpu_worker(void *arg)
             .buffer_info = {
                 .src_buffer = ctx->hc->mem_segs.put.base + offset * sizeof(int),
                 .dst_buffer = ctx->hc->mem_segs.get.base + offset * sizeof(int),
+//                 .dst_buffer = ctx->hc->mem_segs.put.base + offset * sizeof(int),
                 .len        = block * xccl_dt_size(dpu_hc_get_dtype(ctx->hc)),
             },
             .reduce_info = {
@@ -109,7 +110,9 @@ void *dpu_worker(void *arg)
             dpu_hc_reply(ctx->hc, ctx->itt);
         }
     }
-        
+
+//     fprintf(stderr, "ctx->itt = %u\n", ctx->itt);
+
     return NULL;
 }
 
@@ -139,14 +142,16 @@ int main(int argc, char **argv)
 
     dpu_hc_init(hc);
     dpu_hc_accept(hc);
-
+        
+//     XCCL_CHECK(dpu_xccl_alloc_team(&xccl_glob, &tctx_pool[0].comm));
+// 
     for(i = 0; i < nthreads; i++) {
 //         printf("Thread %d spawned!\n", i);
         XCCL_CHECK(dpu_xccl_alloc_team(&xccl_glob, &tctx_pool[i].comm));
-      
+//         tctx_pool[i].comm = tctx_pool[0].comm; 
         tctx_pool[i].idx = i;
         tctx_pool[i].nthreads = nthreads;
-        tctx_pool[i].hc    = hc;
+        tctx_pool[i].hc       = hc;
         tctx_pool[i].itt = 0;
 
         if (i < nthreads - 1) {

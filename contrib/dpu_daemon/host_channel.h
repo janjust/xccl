@@ -27,7 +27,7 @@
 #define ERROR               1
 #define DEFAULT_PORT        13337
 
-#define DATA_BUFFER_SIZE     (16*1024*1024)
+#define DATA_BUFFER_SIZE     (128*1024*1024)
 
 #define EXCHANGE_LENGTH_TAG 1ull
 #define EXCHANGE_RKEY_TAG 2ull
