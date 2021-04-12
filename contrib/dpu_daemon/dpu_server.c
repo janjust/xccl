@@ -3,6 +3,8 @@
  * See file LICENSE for terms.
  */
 
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -11,6 +13,7 @@
 #include "server_xccl.h"
 #include "host_channel.h"
 
+#define CORES 8
 #define MAX_THREADS 128
 typedef struct {
     pthread_t id;
@@ -32,10 +35,22 @@ static thread_sync_t *thread_sync = NULL;
 
 void *dpu_worker(void *arg)
 {
-    int i = 0;
+    int i = 0, j;
     thread_ctx_t *ctx = (thread_ctx_t*)arg;
     xccl_coll_req_h request;
-   
+
+    cpu_set_t cpuset;
+    pthread_t thread;
+    thread = pthread_self();
+
+    CPU_ZERO(&cpuset);
+    int places = CORES/ctx->nthreads;
+	for (i = 0; i < places; i++) {
+		CPU_SET((ctx->idx*places)+i, &cpuset);
+	}
+
+    i = pthread_setaffinity_np(thread, sizeof(cpuset), &cpuset);
+
     while(1) {
         ctx->itt++;
         if (ctx->idx > 0) {
@@ -142,13 +157,10 @@ int main(int argc, char **argv)
 
     dpu_hc_init(hc);
     dpu_hc_accept(hc);
-        
-//     XCCL_CHECK(dpu_xccl_alloc_team(&xccl_glob, &tctx_pool[0].comm));
-// 
+
     for(i = 0; i < nthreads; i++) {
 //         printf("Thread %d spawned!\n", i);
         XCCL_CHECK(dpu_xccl_alloc_team(&xccl_glob, &tctx_pool[i].comm));
-//         tctx_pool[i].comm = tctx_pool[0].comm; 
         tctx_pool[i].idx = i;
         tctx_pool[i].nthreads = nthreads;
         tctx_pool[i].hc       = hc;

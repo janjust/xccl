@@ -33,7 +33,6 @@
 #define EXCHANGE_RKEY_TAG 2ull
 #define EXCHANGE_ADDR_TAG 3ull
 
-
 typedef struct dpu_req_s {
     int complete;
 } dpu_req_t;

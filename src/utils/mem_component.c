@@ -119,6 +119,35 @@ xccl_status_t xccl_mem_component_reduce(void *sbuf1, void *sbuf2, void *target,
     return mem_components[mem_type]->reduce(sbuf1, sbuf2, target, count, dtype, op);
 }
 
+static xccl_status_t
+xccl_fused_reduce_multi(float *sbuf1, float *sbuf2, float *rbuf, size_t count,
+                       size_t size, size_t stride)
+{
+    int i,j;
+
+    if (count == 3) {
+        float *buf0 = sbuf2;
+        float *buf1 = sbuf2 + stride/sizeof(float);
+        float *buf2 = sbuf2 + 2*stride/sizeof(float);
+#pragma omp parallel for
+        for (i = 0; i < size; i++) {
+            rbuf[i] = sbuf1[i] + buf0[i] + buf1[i] + buf2[i];
+        }
+    } else {
+#pragma omp parallel for
+        for (i = 0; i < size; i++) {
+            rbuf[i] = sbuf1[i] + sbuf2[i];
+        }
+        for (j = 1; j < count; j++) {
+            float *buf = sbuf2 + stride*j/sizeof(float);
+            for (i = 0; i < size; i++) {
+                rbuf[i] += buf[i];
+            }
+        }
+    }
+    return XCCL_OK;
+}
+
 xccl_status_t
 xccl_mem_component_reduce_multi(void *sbuf1, void *sbuf2, void *rbuf, size_t count,
                                 size_t size, size_t stride, xccl_dt_t dtype,
@@ -131,6 +160,9 @@ xccl_mem_component_reduce_multi(void *sbuf1, void *sbuf2, void *rbuf, size_t cou
     }
 
     if (mem_type == UCS_MEMORY_TYPE_HOST) {
+        if (dtype == XCCL_DT_FLOAT32 && op == XCCL_OP_SUM) {
+            return xccl_fused_reduce_multi(sbuf1, sbuf2, rbuf, count, size, stride);
+        }
         xccl_dt_reduce(sbuf1, sbuf2, rbuf, size, dtype, op);
         for (i = 1; i < count; i++) {
             xccl_dt_reduce((void*)((ptrdiff_t)sbuf2 + stride*i), rbuf,
